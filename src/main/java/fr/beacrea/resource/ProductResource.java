@@ -1,7 +1,10 @@
 package fr.beacrea.resource;
 
 import fr.beacrea.entity.Product;
+import fr.beacrea.entity.StockAlert;
+import fr.beacrea.service.EmailService;
 import io.quarkus.logging.Log;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Context;
@@ -9,6 +12,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -16,6 +20,9 @@ import java.util.Map;
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class ProductResource {
+
+    @Inject
+    EmailService mEmailService;
 
     // --- Routes publiques ---
 
@@ -92,10 +99,39 @@ public class ProductResource {
         }
         if (pPartial.name != null) lProduct.name = pPartial.name;
         if (pPartial.price != null) lProduct.price = pPartial.price;
-        if (pPartial.stock != null) lProduct.stock = pPartial.stock;
         if (pPartial.description != null) lProduct.description = pPartial.description;
         if (pPartial.images != null) lProduct.images = pPartial.images;
         if (pPartial.badge != null) lProduct.badge = pPartial.badge;
+
+        if (pPartial.stock != null) {
+            // Sauvegarde l'ancien stock pour détecter les retours en stock
+            Map<String, Integer> lOldStock = new HashMap<>();
+            if (lProduct.stock != null) {
+                lProduct.stock.fields().forEachRemaining(e -> lOldStock.put(e.getKey(), e.getValue().asInt(0)));
+            }
+
+            lProduct.stock = pPartial.stock;
+
+            // Notifie les abonnés pour chaque taille repassée en stock
+            String lProductName = lProduct.name;
+            long lProductId = lProduct.id;
+            pPartial.stock.fields().forEachRemaining(e -> {
+                String lSize = e.getKey();
+                int lNewQty = e.getValue().asInt(0);
+                int lOldQty = lOldStock.getOrDefault(lSize, 0);
+                if (lOldQty <= 0 && lNewQty > 0) {
+                    List<StockAlert> lAlerts = StockAlert.list(
+                            "productId = ?1 and size = ?2 and notified = false", lProductId, lSize);
+                    for (StockAlert lAlert : lAlerts) {
+                        mEmailService.sendBackInStockToSubscriber(lAlert.userEmail, lProductName, lSize);
+                        lAlert.notified = true;
+                        Log.infof("Back-in-stock notification sent. productId=%d, size=%s, email=%s",
+                                lProductId, lSize, lAlert.userEmail);
+                    }
+                }
+            });
+        }
+
         Log.infof("Product patched. productId=%d", pId);
         return Response.ok(lProduct).build();
     }

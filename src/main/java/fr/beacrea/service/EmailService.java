@@ -369,6 +369,25 @@ public class EmailService {
         return lBuilder.toString().stripTrailing();
     }
 
+    // ─── Alertes retour en stock ──────────────────────────────────────────────
+
+    public void sendBackInStockToSubscriber(String pUserEmail, String pProductName, String pSize) {
+        send(pUserEmail,
+                SHOP_NAME + " – " + pProductName + " est de nouveau disponible !",
+                String.join("\n",
+                        "Bonjour,",
+                        "",
+                        "Bonne nouvelle ! Le produit que vous attendiez est de nouveau disponible :",
+                        "",
+                        pProductName + " – Taille " + pSize,
+                        "",
+                        "Rendez-vous vite sur notre boutique avant nouvelle rupture de stock.",
+                        "",
+                        "À bientôt,",
+                        ADMIN_NAME + " – " + SHOP_NAME
+                ));
+    }
+
     // ─── Retours ──────────────────────────────────────────────────────────────
 
     public void sendReturnRequestToClient(OrderReturn pReturn) {
