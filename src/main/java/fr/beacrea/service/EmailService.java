@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.beacrea.entity.AppUser;
 import fr.beacrea.entity.CustomOrder;
+import fr.beacrea.entity.GiftCard;
 import fr.beacrea.entity.Order;
+import fr.beacrea.entity.OrderReturn;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -365,5 +367,120 @@ public class EmailService {
             lBuilder.append(String.format("  - %s (%s) ×%d : %.2f €%n", lName, lSize, lQty, lPrice * lQty));
         }
         return lBuilder.toString().stripTrailing();
+    }
+
+    // ─── Retours ──────────────────────────────────────────────────────────────
+
+    public void sendReturnRequestToClient(OrderReturn pReturn) {
+        if (pReturn.email == null) return;
+        int lItemCount = pReturn.items != null && pReturn.items.isArray() ? pReturn.items.size() : 0;
+        send(pReturn.email,
+                SHOP_NAME + " – Votre demande de retour a bien été reçue",
+                String.join("\n",
+                        "Bonjour " + (pReturn.userName != null ? pReturn.userName : "") + ",",
+                        "",
+                        "Nous avons bien reçu votre demande de retour pour " + lItemCount + " article" + (lItemCount > 1 ? "s" : "") + " de la commande #" + pReturn.orderId + ".",
+                        "",
+                        "Nous allons examiner votre demande et vous recontacterons prochainement.",
+                        "Vous pouvez suivre l'état de votre retour dans votre espace client.",
+                        "",
+                        "Cordialement,",
+                        ADMIN_NAME + " – " + SHOP_NAME
+                ));
+    }
+
+    public void sendNewReturnToAdmin(OrderReturn pReturn) {
+        int lItemCount = pReturn.items != null && pReturn.items.isArray() ? pReturn.items.size() : 0;
+        send(mAdminEmail,
+                "↩️ Nouvelle demande de retour – Commande #" + pReturn.orderId,
+                String.join("\n",
+                        "Bonjour " + ADMIN_NAME + ",",
+                        "",
+                        (pReturn.userName != null ? pReturn.userName : pReturn.email) + " a soumis une demande de retour.",
+                        "",
+                        "Commande : #" + pReturn.orderId,
+                        "Articles : " + lItemCount + " article" + (lItemCount > 1 ? "s" : ""),
+                        "Motif : " + (pReturn.reason != null ? pReturn.reason : "Non précisé"),
+                        pReturn.notes != null ? "Notes : " + pReturn.notes : "",
+                        "",
+                        "Connectez-vous au back-office pour traiter cette demande."
+                ).replace("\n\n\n", "\n\n"));
+    }
+
+    public void sendReturnApprovedToClient(OrderReturn pReturn) {
+        if (pReturn.email == null) return;
+        send(pReturn.email,
+                SHOP_NAME + " – Votre retour a été approuvé",
+                String.join("\n",
+                        "Bonjour " + (pReturn.userName != null ? pReturn.userName : "") + ",",
+                        "",
+                        "Votre demande de retour pour la commande #" + pReturn.orderId + " a été approuvée.",
+                        "",
+                        pReturn.refundAmount != null ? "Montant du remboursement : " + String.format("%.2f", pReturn.refundAmount) + " €" : "",
+                        "",
+                        "Veuillez nous retourner vos articles dans leur emballage d'origine dans les 7 jours.",
+                        "Le remboursement sera effectué sous 5 à 10 jours ouvrés après réception.",
+                        "",
+                        "Cordialement,",
+                        ADMIN_NAME + " – " + SHOP_NAME
+                ).replace("\n\n\n", "\n\n"));
+    }
+
+    public void sendReturnRejectedToClient(OrderReturn pReturn) {
+        if (pReturn.email == null) return;
+        send(pReturn.email,
+                SHOP_NAME + " – Votre demande de retour",
+                String.join("\n",
+                        "Bonjour " + (pReturn.userName != null ? pReturn.userName : "") + ",",
+                        "",
+                        "Nous avons examiné votre demande de retour pour la commande #" + pReturn.orderId + ".",
+                        "",
+                        "Après vérification, nous ne sommes malheureusement pas en mesure de l'accepter.",
+                        pReturn.rejectionReason != null ? "Motif : " + pReturn.rejectionReason : "",
+                        "",
+                        "N'hésitez pas à nous contacter si vous avez des questions.",
+                        "",
+                        "Cordialement,",
+                        ADMIN_NAME + " – " + SHOP_NAME
+                ).replace("\n\n\n", "\n\n"));
+    }
+
+    public void sendReturnRefundedToClient(OrderReturn pReturn) {
+        if (pReturn.email == null) return;
+        send(pReturn.email,
+                SHOP_NAME + " – Remboursement effectué",
+                String.join("\n",
+                        "Bonjour " + (pReturn.userName != null ? pReturn.userName : "") + ",",
+                        "",
+                        "Votre remboursement pour la commande #" + pReturn.orderId + " a bien été effectué.",
+                        "",
+                        pReturn.refundAmount != null ? "Montant remboursé : " + String.format("%.2f", pReturn.refundAmount) + " €" : "",
+                        "",
+                        "Le montant sera crédité sur votre moyen de paiement initial sous 3 à 5 jours ouvrés.",
+                        "",
+                        "Merci de votre confiance,",
+                        ADMIN_NAME + " – " + SHOP_NAME
+                ).replace("\n\n\n", "\n\n"));
+    }
+
+    // ─── Cartes cadeaux ───────────────────────────────────────────────────────
+
+    public void sendGiftCardToRecipient(GiftCard pCard) {
+        if (pCard.recipientEmail == null) return;
+        send(pCard.recipientEmail,
+                SHOP_NAME + " – Vous avez reçu une carte cadeau de " + String.format("%.2f", pCard.amount) + " € !",
+                String.join("\n",
+                        "Bonjour,",
+                        "",
+                        "Vous avez reçu une carte cadeau " + SHOP_NAME + " d'une valeur de " + String.format("%.2f", pCard.amount) + " € !",
+                        pCard.message != null && !pCard.message.isBlank() ? "\nMessage : \"" + pCard.message + "\"\n" : "",
+                        "Votre code : " + pCard.code,
+                        "",
+                        "Utilisez ce code lors de votre paiement sur notre boutique en ligne.",
+                        "Il est valable jusqu'à épuisement du solde.",
+                        "",
+                        "Bonne découverte,",
+                        ADMIN_NAME + " – " + SHOP_NAME
+                ).replace("\n\n\n", "\n\n"));
     }
 }

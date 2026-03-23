@@ -1,7 +1,9 @@
 package fr.beacrea.resource;
 
 import fr.beacrea.entity.GiftCard;
+import fr.beacrea.service.EmailService;
 import io.quarkus.logging.Log;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Context;
@@ -18,6 +20,9 @@ import java.util.Map;
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class GiftCardResource {
+
+    @Inject
+    EmailService mEmailService;
 
     /**
      * Crée une carte cadeau (admin ou client connecté).
@@ -40,6 +45,7 @@ public class GiftCardResource {
         pCard.createdAt = Instant.now().toString();
         pCard.usedAt = null;
         pCard.persist();
+        mEmailService.sendGiftCardToRecipient(pCard);
         Log.infof("Gift card created. code=%s, amount=%.2f, recipientEmail=%s", pCard.code, pCard.amount, pCard.recipientEmail);
         return Response.status(201).entity(pCard).build();
     }
