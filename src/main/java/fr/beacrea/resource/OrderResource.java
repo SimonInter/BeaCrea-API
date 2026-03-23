@@ -120,9 +120,12 @@ public class OrderResource {
         if (lOrder == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
+        if (pPartial.trackingNumber != null) lOrder.trackingNumber = pPartial.trackingNumber;
+        if (pPartial.carrier != null) lOrder.carrier = pPartial.carrier;
         if (pPartial.status != null) {
             lOrder.status = pPartial.status;
-            Log.infof("Order status updated. orderId=%d, newStatus=%s", pId, pPartial.status);
+            Log.infof("Order status updated. orderId=%d, newStatus=%s, trackingNumber=%s",
+                    pId, pPartial.status, lOrder.trackingNumber);
             mEmailService.sendOrderStatusUpdateToClient(lOrder, pPartial.status);
         }
         return Response.ok(lOrder).build();

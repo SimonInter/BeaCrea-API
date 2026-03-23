@@ -50,6 +50,12 @@ public class Order extends PanacheEntityBase {
     @Column(name = "payment_intent_id")
     public String paymentIntentId;
 
+    @Column(name = "tracking_number")
+    public String trackingNumber;
+
+    @Column(name = "carrier")
+    public String carrier;
+
     @Column(name = "created_at")
     public String createdAt;
 

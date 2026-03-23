@@ -174,12 +174,19 @@ public class EmailService {
 
         String lFirstName = fieldFromJson(pOrder.shippingAddress, "firstName");
         String lStatusLabel = ORDER_STATUS_LABELS.getOrDefault(pNewStatus, pNewStatus);
+        String lTrackingBlock = "";
+        if ("shipped".equals(pNewStatus) && pOrder.trackingNumber != null && !pOrder.trackingNumber.isBlank()) {
+            String lTrackingUrl = buildTrackingUrl(pOrder.carrier, pOrder.trackingNumber);
+            lTrackingBlock = "\n\nNuméro de suivi : " + pOrder.trackingNumber
+                    + (lTrackingUrl.isBlank() ? "" : "\nSuivre votre colis : " + lTrackingUrl);
+        }
+
         String lStatusMessage = switch (pNewStatus) {
             case "confirmed" -> "Votre commande #" + pOrder.id + " a été confirmée et est en cours de préparation.";
-            case "shipped" -> "Votre commande #" + pOrder.id + " a été expédiée ! Vous recevrez votre colis dans les prochains jours.";
+            case "shipped"   -> "Votre commande #" + pOrder.id + " a été expédiée ! Vous recevrez votre colis dans les prochains jours." + lTrackingBlock;
             case "delivered" -> "Votre commande #" + pOrder.id + " a été livrée. Nous espérons que vous êtes satisfait(e) de votre achat !";
             case "cancelled" -> "Votre commande #" + pOrder.id + " a été annulée. N'hésitez pas à nous contacter si vous avez des questions.";
-            default -> "Votre commande #" + pOrder.id + " a été mise à jour : " + lStatusLabel + ".";
+            default          -> "Votre commande #" + pOrder.id + " a été mise à jour : " + lStatusLabel + ".";
         };
 
         send(pOrder.email,
@@ -348,6 +355,18 @@ public class EmailService {
     }
 
     // ─── Utilitaires privés ───────────────────────────────────────────────────
+
+    /** Construit l'URL de suivi selon le transporteur. */
+    private String buildTrackingUrl(String pCarrier, String pTrackingNumber) {
+        if (pCarrier == null || pTrackingNumber == null) return "";
+        return switch (pCarrier.toLowerCase()) {
+            case "colissimo"     -> "https://www.laposte.fr/outils/suivre-vos-envois?code=" + pTrackingNumber;
+            case "chronopost"    -> "https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=" + pTrackingNumber;
+            case "mondial relay" -> "https://www.mondialrelay.fr/suivi-de-colis/?numcolis=" + pTrackingNumber;
+            case "dhl"           -> "https://www.dhl.com/fr-fr/home/tracking.html?tracking-id=" + pTrackingNumber;
+            default              -> "";
+        };
+    }
 
     /** Extrait un champ texte d'un JsonNode (shippingAddress, etc.). */
     private String fieldFromJson(JsonNode pNode, String pField) {
