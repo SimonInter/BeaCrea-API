@@ -33,6 +33,12 @@ public class AppUser extends PanacheEntityBase {
     @Column(name = "wishlist", columnDefinition = "text")
     public JsonNode wishlist;
 
+    @Column(name = "phone")
+    public String phone;
+
+    @Column(name = "role", nullable = false)
+    public String role = "user";
+
     @Column(name = "created_at")
     public String createdAt;
 
