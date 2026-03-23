@@ -47,6 +47,9 @@ public class Order extends PanacheEntityBase {
     @Column(name = "status")
     public String status;
 
+    @Column(name = "payment_intent_id")
+    public String paymentIntentId;
+
     @Column(name = "created_at")
     public String createdAt;
 

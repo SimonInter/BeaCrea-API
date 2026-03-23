@@ -56,6 +56,15 @@ public class OrderResource {
             return Response.status(401).entity(Map.of("error", "Authentification requise")).build();
         }
 
+        // Vérification du paiement Stripe avant de créer la commande
+        if (pOrder.paymentIntentId == null || pOrder.paymentIntentId.isBlank()) {
+            return Response.status(400).entity(Map.of("error", "PaymentIntent manquant")).build();
+        }
+        if (!PaymentResource.isPaymentSucceeded(pOrder.paymentIntentId)) {
+            Log.warnf("Order creation refused: payment not succeeded. intentId=%s", pOrder.paymentIntentId);
+            return Response.status(402).entity(Map.of("error", "Paiement non confirmé")).build();
+        }
+
         // Décrémentation du stock pour chaque article
         if (pOrder.items != null) {
             for (JsonNode lItem : pOrder.items) {

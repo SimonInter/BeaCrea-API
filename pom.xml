@@ -61,6 +61,13 @@
       <artifactId>jbcrypt</artifactId>
       <version>0.4</version>
     </dependency>
+
+    <!-- Stripe : paiements en ligne -->
+    <dependency>
+      <groupId>com.stripe</groupId>
+      <artifactId>stripe-java</artifactId>
+      <version>26.0.0</version>
+    </dependency>
   </dependencies>
 
   <build>
