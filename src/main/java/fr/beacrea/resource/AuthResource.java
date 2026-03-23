@@ -1,6 +1,7 @@
 package fr.beacrea.resource;
 
 import fr.beacrea.entity.AppUser;
+import fr.beacrea.service.EmailService;
 import fr.beacrea.service.JwtService;
 import io.quarkus.logging.Log;
 import jakarta.inject.Inject;
@@ -20,6 +21,9 @@ public class AuthResource {
 
     @Inject
     JwtService mJwtService;
+
+    @Inject
+    EmailService mEmailService;
 
     /**
      * Connexion : vérifie email + mot de passe, retourne un JWT.
@@ -79,6 +83,7 @@ public class AuthResource {
 
         String lToken = mJwtService.generateToken(lUser.id, lUser.role);
         Log.infof("New user registered. userId=%s, email=%s", lUser.id, lEmail);
+        mEmailService.sendWelcomeEmail(lUser);
 
         return Response.status(201).entity(Map.of(
             "token", lToken,

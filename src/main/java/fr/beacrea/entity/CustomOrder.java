@@ -18,6 +18,15 @@ public class CustomOrder extends PanacheEntityBase {
     @Column(name = "user_id", nullable = false)
     public String userId;
 
+    @Column(name = "user_email")
+    public String userEmail;
+
+    @Column(name = "user_name")
+    public String userName;
+
+    @Column(name = "type")
+    public String type;
+
     @Column(name = "status", nullable = false)
     public String status = "received";
 

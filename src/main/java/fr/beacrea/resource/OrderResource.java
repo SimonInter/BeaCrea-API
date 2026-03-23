@@ -3,7 +3,9 @@ package fr.beacrea.resource;
 import com.fasterxml.jackson.databind.JsonNode;
 import fr.beacrea.entity.Order;
 import fr.beacrea.entity.Product;
+import fr.beacrea.service.EmailService;
 import io.quarkus.logging.Log;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Context;
@@ -20,6 +22,9 @@ import java.util.Map;
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class OrderResource {
+
+    @Inject
+    EmailService mEmailService;
 
     @GET
     public Response list(
@@ -98,6 +103,8 @@ public class OrderResource {
         pOrder.persist();
 
         Log.infof("Order created. orderId=%d, userId=%s, total=%s", pOrder.id, pOrder.userId, pOrder.total);
+        mEmailService.sendOrderConfirmationToClient(pOrder);
+        mEmailService.sendNewOrderToAdmin(pOrder);
         return Response.status(Response.Status.CREATED).entity(pOrder).build();
     }
 
@@ -116,6 +123,7 @@ public class OrderResource {
         if (pPartial.status != null) {
             lOrder.status = pPartial.status;
             Log.infof("Order status updated. orderId=%d, newStatus=%s", pId, pPartial.status);
+            mEmailService.sendOrderStatusUpdateToClient(lOrder, pPartial.status);
         }
         return Response.ok(lOrder).build();
     }

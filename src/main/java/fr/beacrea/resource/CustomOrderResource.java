@@ -3,7 +3,9 @@ package fr.beacrea.resource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import fr.beacrea.entity.AppUser;
 import fr.beacrea.entity.CustomOrder;
+import fr.beacrea.service.EmailService;
 import io.quarkus.logging.Log;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -26,6 +28,9 @@ public class CustomOrderResource {
     @Inject
     ObjectMapper mObjectMapper;
 
+    @Inject
+    EmailService mEmailService;
+
     // --- Routes client ---
 
     /**
@@ -37,14 +42,25 @@ public class CustomOrderResource {
         if (pSecurityContext.getUserPrincipal() == null) {
             return Response.status(401).entity(Map.of("error", "Authentification requise")).build();
         }
-        pOrder.userId = pSecurityContext.getUserPrincipal().getName();
+        String lUserId = pSecurityContext.getUserPrincipal().getName();
+        pOrder.userId = lUserId;
         pOrder.status = "received";
         pOrder.createdAt = Instant.now().toString();
         if (pOrder.messages == null) {
             pOrder.messages = mObjectMapper.createArrayNode();
         }
+
+        // Enrichit la demande avec email et nom du client pour les emails
+        AppUser lUser = AppUser.findById(lUserId);
+        if (lUser != null) {
+            pOrder.userEmail = lUser.email;
+            pOrder.userName = lUser.firstName + " " + lUser.lastName;
+        }
+
         pOrder.persist();
         Log.infof("Custom order created. customOrderId=%d, userId=%s", pOrder.id, pOrder.userId);
+        mEmailService.sendCustomOrderReceivedToAdmin(pOrder);
+        mEmailService.sendCustomOrderReceivedToClient(pOrder);
         return Response.status(201).entity(pOrder).build();
     }
 
@@ -118,7 +134,9 @@ public class CustomOrderResource {
         lMessages.add(lNewMessage);
         lOrder.messages = lMessages;
 
-        Log.infof("Message added to custom order. customOrderId=%d, from=%s", pId, lNewMessage.get("from").asText());
+        String lFrom = lNewMessage.get("from").asText();
+        Log.infof("Message added to custom order. customOrderId=%d, from=%s", pId, lFrom);
+        mEmailService.sendCustomOrderMessage(lOrder, lFrom, pMessage.content());
         return Response.ok(lOrder).build();
     }
 
@@ -153,10 +171,14 @@ public class CustomOrderResource {
         if (lOrder == null) {
             return Response.status(404).build();
         }
+        boolean lStatusChanged = pPartial.status != null && !pPartial.status.equals(lOrder.status);
         if (pPartial.status != null) lOrder.status = pPartial.status;
         if (pPartial.quote != null) lOrder.quote = pPartial.quote;
         if (pPartial.notes != null) lOrder.notes = pPartial.notes;
         Log.infof("Custom order updated. customOrderId=%d, status=%s", pId, lOrder.status);
+        if (lStatusChanged) {
+            mEmailService.sendCustomOrderStatusUpdate(lOrder);
+        }
         return Response.ok(lOrder).build();
     }
 
