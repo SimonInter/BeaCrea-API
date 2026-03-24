@@ -25,14 +25,23 @@ public class PaymentResource {
     @ConfigProperty(name = "stripe.secret-key")
     String mStripeSecretKey;
 
+    private boolean mStripeEnabled;
+
     @PostConstruct
     void init() {
-        Stripe.apiKey = mStripeSecretKey;
+        mStripeEnabled = mStripeSecretKey != null && !mStripeSecretKey.startsWith("sk_test_REMPLACER");
+        if (mStripeEnabled) {
+            Stripe.apiKey = mStripeSecretKey;
+            Log.info("Stripe enabled.");
+        } else {
+            Log.warn("Stripe is disabled (no valid key configured). Payment will be simulated in dev mode.");
+        }
     }
 
     /**
      * Crée un PaymentIntent Stripe et retourne le clientSecret au frontend.
      * Le montant est en euros (ex: 49.90), converti en centimes pour Stripe.
+     * En mode dev (Stripe désactivé), retourne un clientSecret fictif.
      */
     @POST
     @Path("/create-intent")
@@ -45,6 +54,15 @@ public class PaymentResource {
         Object lAmountObj = pBody.get("amount");
         if (lAmountObj == null) {
             return Response.status(400).entity(Map.of("error", "Le montant est requis")).build();
+        }
+
+        // Mode dev : Stripe non configuré → retourne un PaymentIntent simulé
+        if (!mStripeEnabled) {
+            Log.infof("Stripe disabled — returning simulated payment intent. amount=%s", lAmountObj);
+            return Response.ok(Map.of(
+                "clientSecret", "local_test_disabled",
+                "simulated", true
+            )).build();
         }
 
         try {
@@ -81,8 +99,13 @@ public class PaymentResource {
     /**
      * Vérifie qu'un PaymentIntent est bien payé (status = succeeded).
      * Utilisé par OrderResource avant de créer la commande.
+     * En mode dev simulé, accepte directement l'ID fictif.
      */
     public static boolean isPaymentSucceeded(String pPaymentIntentId) {
+        if ("local_test_disabled".equals(pPaymentIntentId)) {
+            Log.warn("Stripe disabled — skipping payment verification for simulated order.");
+            return true;
+        }
         try {
             PaymentIntent lPaymentIntent = PaymentIntent.retrieve(pPaymentIntentId);
             return "succeeded".equals(lPaymentIntent.getStatus());
